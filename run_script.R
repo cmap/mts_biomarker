@@ -1,48 +1,225 @@
-# Pass 5 arguments in order as follows:
-# args[1] = full path to cell_info file
-# args[2] = full path to sig_metrics file
-# args[3] = full path to ZSPC combat gct file
-# args[4] = full path to output directory. must end with a "/"
-# args[5] = the name of the compound
-
-args = commandArgs(trailingOnly=TRUE)
-if (length(args) !=5) {
-  stop("Supply 5 args. Full path to cell_info, sig_metrics,combat_gct,out_path,compound name in the order specified", call.=FALSE)
+#---- PRE-SETUP (arguments and packages) ----
+# Pass 2 arguments in this order:
+# args[1] = full path to directory with data for a compound/project
+# args[2] = full path to directory for output data
+args <- commandArgs(trailingOnly=TRUE)
+if (length(args) != 2) {
+  stop("Supply a path to a directory containing the data and output directory",
+       call.=FALSE)
 }
 
+# packages
 library(tidyverse)
-library(useful)
+library(cdsrmodels)
+library(taigr)
 library(magrittr)
-library(cmapR)
-library(cdsrbiomarker)
 
-cell_info =  args[1];
-sig_metrics =  args[2];
-combat_gct = args[3];
-out_path = args[4];
-compound  = args[5];
+data_dir <- args[1]
+output_dir <- args[2]
 
-# LOAD THE DATA - fairly straightforward, please feel free to modify
-cell_info = data.table::fread(cell_info)
-sig_info = data.table::fread(sig_metrics) %>%
-   dplyr::filter(pert_type == "trt_cp") %>%
-   dplyr::distinct(sig_id, pert_time, pert_mfc_id, pert_dose, pert_iname)
+#---- LOAD THE DATA ----
+drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
+lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
+DRC <- data.table::fread(drc_path) %>%
+  dplyr::distinct(ccle_name, culture, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
+  dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
+                                   3 * max_dose, log2.ic50),
+                log2.auc = log2(auc)) %>%
+  tidyr::pivot_longer(cols = c("log2.auc", "log2.ic50"),
+                      names_to = "dose", values_to = "response") %>%
+  dplyr::filter(is.finite(response))
+LFC <- data.table::fread(lfc_path) %>%
+  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
+  dplyr::rename(response = LFC.cb, dose = pert_idose) %>%
+  dplyr::filter(is.finite(response))
 
-data <- parse_gctx(combat_gct)@mat
- rownames(data) = tibble(rid = rownames(data)) %>%
-   dplyr::left_join(cell_info %>% dplyr::distinct(rid, cell_id)) %>%
-   .$cell_id
- data = data[, sig_info$sig_id]
+# combine into large table
+all_Y <- dplyr::bind_rows(DRC, LFC)
 
- dir.create(out_path, recursive=T)
- temp_path = paste0(out_path, compound)
-  dir.create(temp_path)
-  temp_meta = sig_info %>%
-    dplyr::filter(pert_mfc_id == compound)
+# data names/types for loading from taiga
+rf_data <- c("x-all", "x-ccle")
+discrete_data <- c("lin", "mut")
+linear_data <- c("ge", "xpr", "cna", "met", "mirna", "rep", "prot", "shrna")
+linear_names <- c("GE", "XPR", "CNA", "MET", "miRNA", "REP", "PROT", "shRNA")
+rep_meta <- load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
+                            data.file='primary-replicate-collapsed-treatment-info') %>%
+  dplyr::select(column_name, name) %>%
+  dplyr::mutate(column_name = paste0("REP_", column_name))
 
-  write_csv(temp_meta, paste0(temp_path, "/meta_data.csv"))
-  write.csv(data[, temp_meta$sig_id], paste0(temp_path, "/data.csv"))
-  #res = get_biomarkers(Y = data[, temp_meta$sig_id], out_path = temp_path)
-  res = get_biomarkers(Y = data[, temp_meta$sig_id, drop = F], out_path = temp_path).
-  generate_multi_profile_biomarker_report(temp_path, compound)
+runs <- distinct(all_Y, pert_name, pert_mfc_id, dose)
 
+#---- LOOP THORUGH DATASETS AND DOSES ----
+
+# linear associations
+linear_table <- list(); ix <- 1
+for(feat in 1:length(linear_data)) {
+  
+  # load feature set
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+                              data.file=linear_data[feat], quiet=T)
+  
+  # for each perturbation get results
+  for(i in 1:nrow(runs)) {
+    # filter down to current dose (run)
+    run <- runs[i,]
+    Y <- all_Y %>%
+      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+    y <- Y$response; names(y) <- Y$ccle_name
+    y <- y[is.finite(y)]
+    
+    # get overlapping data
+    overlap <- dplyr::intersect(rownames(X), names(y))
+    y <- y[overlap]
+    if (length(y) < 5 | min(y) == max(y)) next
+    
+    # calculate correlations
+    res.lin <- cdsrmodels::lin_associations(X[overlap,], y)
+    res.cor <- res.lin$res.table %>%
+      cbind(., rho=res.lin$rho[rownames(.),], q.val=res.lin$q.val[rownames(.),]) %>%
+      tibble::as_tibble() %>%
+      dplyr::rename(feature = ind.var, coef = rho) %>%
+      dplyr::mutate(rank = 1:n()) %>%
+      dplyr::filter(rank <= 500) %>%
+      dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
+                    pert_name = run$pert_name,
+                    dose = run$dose,
+                    feature_type = linear_names[feat])
+    
+    # for repurposing replace metadata
+    if (linear_data[feat] == "rep") {
+      res.cor %<>%
+        dplyr::left_join(rep_meta, by = c("feature" = "column_name")) %>%
+        dplyr::select(-feature) %>%
+        dplyr::rename(feature = name) %>%
+        dplyr::mutate(feature = paste("REP", feature, sep = "_"))
+    }
+    
+    # append to output tables
+    linear_table[[ix]] <- res.cor; ix <- ix + 1
+  }
+  
+  # gene expression with lineage as confounder
+  if (linear_data[feat] == "ge") {
+    # get lineage principal components to use as confounder
+    LIN <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+                                  data.file="lin", quiet=T)
+    LIN_PCs <- gmodels::fast.prcomp(LIN);
+    LIN_PCs <-  LIN %*% LIN_PCs$rotation[, LIN_PCs$sdev  > 0.2]
+    
+    # for each perturbation get results
+    for(i in 1:nrow(runs)) {
+      # filter down to current dose (run)
+      run <- runs[i,]
+      Y <- all_Y %>%
+        dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+      y <- Y$response; names(y) <- Y$ccle_name
+      y <- y[is.finite(y)]
+      
+      # get overlapping data
+      overlap <- dplyr::intersect(rownames(X), names(y)) %>%
+        dplyr::intersect(., rownames(LIN_PCs))
+      y <- y[overlap]
+      if (length(y) < 5 | min(y) == max(y)) next
+      
+      # calculate correlations
+      res.lin <- cdsrmodels::lin_associations(X[overlap,], y, W = LIN_PCs[overlap,])
+      res.cor <- res.lin$res.table %>%
+        cbind(., rho=res.lin$rho[rownames(.),], q.val=res.lin$q.val[rownames(.),]) %>%
+        tibble::as_tibble() %>%
+        dplyr::rename(feature = ind.var, coef = rho) %>%
+        dplyr::mutate(rank = 1:n()) %>%
+        dplyr::filter(rank <= 500) %>%
+        dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
+                      pert_name = run$pert_name,
+                      dose = run$dose,
+                      feature_type = "GE_noLIN")
+      linear_table[[ix]] <- res.cor; ix <- ix + 1
+    }
+  }
+}
+linear_table %<>% dplyr::bind_rows()
+
+# repeat for discrete t-test
+discrete_table <- list(); ix <- 1
+for(feat in 1:length(discrete_data)) {
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+                              data.file=discrete_data[feat], quiet=T)
+  
+  for(i in 1:nrow(runs)) {
+    run <- runs[i,]
+    Y <- all_Y %>%
+      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+    y <- Y$response; names(y) <- Y$ccle_name
+    y <- y[is.finite(y)]
+    
+    overlap <- dplyr::intersect(rownames(X), names(y))
+    y <- y[overlap]
+    
+    if (length(y) < 5 | min(y) == max(y)) next
+    
+    res.disc <- cdsrmodels::discrete_test(X[overlap,], y)
+    
+    res.disc %<>%
+      dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
+                    pert_name = run$pert_name,
+                    dose = run$dose,
+                    feature_type = toupper(discrete_data[feat]))
+    
+    # only keep top 500 mutations
+    if (discrete_data[feat] == "mut" & nrow(res.disc) > 0) {
+      res.disc %<>%
+        dplyr::arrange(q.value) %>%
+        dplyr::mutate(rank = 1:n()) %>%
+        dplyr::filter(rank <= 500) %>%
+        dplyr::select(-rank)
+    }
+    
+    discrete_table[[ix]] <- res.disc; ix <- ix + 1
+  }
+}
+discrete_table %<>% dplyr::bind_rows()
+
+# repeat for random forest
+random_forest_table <- list(); model_table <- list(); ix <- 1
+for(feat in 1:length(rf_data)) {
+  
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+                              data.file=rf_data[feat], quiet=T)
+  model <- word(rf_data[feat], 2, sep = fixed("-"))
+  
+  for (i in 1:nrow(runs)) {
+    run <- runs[i,]
+    Y <- all_Y %>%
+      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+    y <- Y$response; names(y) <- Y$ccle_name
+    y <- y[is.finite(y)]
+    
+    overlap <- dplyr::intersect(rownames(X), names(y))
+    y <- y[overlap]
+    
+    if (length(y) < 5 | min(y) == max(y)) next
+    
+    res.rf <- cdsrmodels::random_forest(X[overlap,], y)
+    res.model <- res.rf$model_table %>%
+      dplyr::distinct(MSE, MSE.se, R2, PearsonScore) %>%
+      dplyr::mutate(model = model,
+                    pert_mfc_id = run$pert_mfc_id,
+                    pert_name = run$pert_name,
+                    dose = run$dose)
+    res.features <- res.rf$model_table %>%
+      dplyr::distinct(feature, RF.imp.mean, RF.imp.sd, RF.imp.stability, rank) %>%
+      dplyr::mutate(model = model,
+                    pert_mfc_id = run$pert_mfc_id,
+                    pert_name = run$pert_name,
+                    dose = run$dose)
+    random_forest_table[[ix]] <- res.features; model_table[[ix]] <- res.model
+  }
+}
+random_forest_table %<>% dplyr::bind_rows(); model_table %<>% dplyr::bind_rows()
+
+# write results to project folder
+if (!dir.exists(output_dir)) dir.create(output_dir, recursive = T)
+readr::write_csv(linear_table, paste0(output_dir, "/continuous_associations.csv"))
+readr::write_csv(discrete_table, paste0(output_dir, "/discrete_associations.csv"))
+readr::write_csv(random_forest_table, paste0(output_dir, "/RF_table.csv"))
+readr::write_csv(model_table, paste0(output_dir, "/Model_table.csv"))
