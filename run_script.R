@@ -1,11 +1,11 @@
 #---- PRE-SETUP (arguments and packages) ----
-# Pass 2 arguments in this order:
+# Pass 3 arguments in this order:
 # args[1] = full path to directory with data for a compound/project
 # args[2] = full path to directory for output data
+# args[3] = the pert_id of the compound to be analyzed
 args <- commandArgs(trailingOnly=TRUE)
-if (length(args) != 2) {
-  stop("Supply a path to a directory containing the data and output directory",
-       call.=FALSE)
+if (length(args) != 3) {
+  stop("Supply the required arguments as described", call.=FALSE)
 }
 
 # packages
@@ -16,20 +16,31 @@ library(magrittr)
 
 data_dir <- args[1]
 output_dir <- args[2]
+compound <- args[3]
 
 #---- LOAD THE DATA ----
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
 lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
-DRC <- data.table::fread(drc_path) %>%
-  dplyr::distinct(ccle_name, culture, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
+DRC <- data.table::fread(drc_path)
+if (!("pert_id" %in% colnames(DRC))) {
+  DRC %<>% dplyr::mutate(pert_id = word(pert_mfc_id, 1, 2, sep = fixed("-")))
+}
+DRC %<>%
+  dplyr::distinct(ccle_name, culture, pert_name, pert_id, pert_mfc_id, auc, log2.ic50, max_dose) %>%
+  dplyr::filter(pert_id == compound) %>%
   dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
                                    3 * max_dose, log2.ic50),
                 log2.auc = log2(auc)) %>%
   tidyr::pivot_longer(cols = c("log2.auc", "log2.ic50"),
                       names_to = "dose", values_to = "response") %>%
   dplyr::filter(is.finite(response))
-LFC <- data.table::fread(lfc_path) %>%
-  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
+LFC <- data.table::fread(lfc_path)
+if (!("pert_id" %in% colnames(LFC))) {
+  DRC %<>% dplyr::mutate(pert_id = word(pert_mfc_id, 1, 2, sep = fixed("-")))
+}
+LFC %<>%
+  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_id, pert_mfc_id, LFC.cb) %>%
+  dplyr::filter(pert_id == compound) %>%
   dplyr::rename(response = LFC.cb, dose = pert_idose) %>%
   dplyr::filter(is.finite(response))
 
