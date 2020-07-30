@@ -3,4 +3,4 @@
 
 docker run -it -v /Users/aboghoss/Downloads/PDEV:/data \
   -v /Users/aboghoss/.taiga/token:/root/.taiga/token \
-  cmap/mts_biomarker -i /data/AZ-628 -o /data/results
+  cmap/mts_biomarker -i /data/AZ-628 -o /data/results/AZ-628
