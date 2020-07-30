@@ -19,26 +19,16 @@ output_dir <- args[2]
 #---- LOAD THE DATA ----
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
 lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
-DRC <- data.table::fread(drc_path)
-if (!("pert_id" %in% colnames(DRC))) {
-  DRC %<>% dplyr::mutate(pert_id = word(pert_mfc_id, 1, 2, sep = fixed("-")))
-}
-DRC %<>%
-  dplyr::distinct(ccle_name, culture, pert_name, pert_id, pert_mfc_id, auc, log2.ic50, max_dose) %>%
-  dplyr::filter(pert_id == compound) %>%
+DRC <- data.table::fread(drc_path) %>%
+  dplyr::distinct(ccle_name, culture, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
   dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
                                    3 * max_dose, log2.ic50),
                 log2.auc = log2(auc)) %>%
   tidyr::pivot_longer(cols = c("log2.auc", "log2.ic50"),
                       names_to = "dose", values_to = "response") %>%
   dplyr::filter(is.finite(response))
-LFC <- data.table::fread(lfc_path)
-if (!("pert_id" %in% colnames(LFC))) {
-  DRC %<>% dplyr::mutate(pert_id = word(pert_mfc_id, 1, 2, sep = fixed("-")))
-}
-LFC %<>%
-  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_id, pert_mfc_id, LFC.cb) %>%
-  dplyr::filter(pert_id == compound) %>%
+LFC <- data.table::fread(lfc_path) %>%
+  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
   dplyr::rename(response = LFC.cb, dose = pert_idose) %>%
   dplyr::filter(is.finite(response))
 
@@ -51,7 +41,8 @@ discrete_data <- c("lin", "mut")
 linear_data <- c("ge", "xpr", "cna", "met", "mirna", "rep", "prot", "shrna")
 linear_names <- c("GE", "XPR", "CNA", "MET", "miRNA", "REP", "PROT", "shRNA")
 rep_meta <- load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
-                            data.file='primary-replicate-collapsed-treatment-info') %>%
+                            data.file='primary-replicate-collapsed-treatment-info',
+                            quiet = T, no.save = T) %>%
   dplyr::select(column_name, name) %>%
   dplyr::mutate(column_name = paste0("REP_", column_name))
 
@@ -65,7 +56,7 @@ for(feat in 1:length(linear_data)) {
 
   # load feature set
   X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
-                              data.file=linear_data[feat], quiet=T)
+                              data.file=linear_data[feat], quiet=T, no.save = T)
 
   # for each perturbation get results
   for(i in 1:nrow(runs)) {
@@ -111,7 +102,7 @@ for(feat in 1:length(linear_data)) {
   if (linear_data[feat] == "ge") {
     # get lineage principal components to use as confounder
     LIN <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
-                                  data.file="lin", quiet=T)
+                                  data.file="lin", quiet=T, no.save = T)
     LIN_PCs <- gmodels::fast.prcomp(LIN);
     LIN_PCs <-  LIN %*% LIN_PCs$rotation[, LIN_PCs$sdev  > 0.2]
 
@@ -152,7 +143,7 @@ linear_table %<>% dplyr::bind_rows()
 discrete_table <- list(); ix <- 1
 for(feat in 1:length(discrete_data)) {
   X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
-                              data.file=discrete_data[feat], quiet=T)
+                              data.file=discrete_data[feat], quiet=T, no.save = T)
 
   for(i in 1:nrow(runs)) {
     run <- runs[i,]
@@ -193,7 +184,7 @@ random_forest_table <- list(); model_table <- list(); ix <- 1
 for(feat in 1:length(rf_data)) {
 
   X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
-                              data.file=rf_data[feat], quiet=T)
+                              data.file=rf_data[feat], quiet=T, no.save = T)
   model <- word(rf_data[feat], 2, sep = fixed("-"))
 
   for (i in 1:nrow(runs)) {

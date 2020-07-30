@@ -12,3 +12,8 @@ while getopts ":i:o:" arg; do
 done
 
 Rscript /run_script.R "${data_dir}" "${output_dir}"
+
+exit_code=$?
+
+echo "$exit_code"
+exit $exit_code
