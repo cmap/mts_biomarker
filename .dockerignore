@@ -2,3 +2,6 @@ docker_build.sh
 docker_run.sh
 docker_push_tags.sh
 token
+Dockerfile
+README.md
+.gitignore
