@@ -5,3 +5,5 @@ token
 Dockerfile
 README.md
 .gitignore
+run_script.sh
+docker-run-aws.sh
