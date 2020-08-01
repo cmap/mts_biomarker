@@ -11,14 +11,16 @@ while getopts ":i:o:" arg; do
   esac
 done
 
-IFS=',' read -r -a a_projects <<< "${projects}"
+#IFS=',' read -r -a a_projects <<< "${projects}"
+
 batch_index=${AWS_BATCH_JOB_ARRAY_INDEX}
-project="${a_projects[${batch_index}]}"
 export HDF5_USE_FILE_LOCKING=FALSE
 
-echo "${batch_index}"
-echo "${data_dir}/${project}" "${output_dir}/${project}"
-Rscript /run_script.R "${data_dir}/${project}" "${output_dir}/${project}"
+pert_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index].pert_name')
+folder_name=$(echo "${sample}" | jq -r --argjson index ${batch_index} '.[$index].project_id')
+
+echo "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
+Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
 
 exit_code=$?
 
