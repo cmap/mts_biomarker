@@ -17,7 +17,7 @@ batch_index=${AWS_BATCH_JOB_ARRAY_INDEX}
 export HDF5_USE_FILE_LOCKING=FALSE
 
 pert_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index].pert_name')
-folder_name=$(echo "${sample}" | jq -r --argjson index ${batch_index} '.[$index].project_id')
+folder_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index].project_id')
 
 echo "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
 Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
