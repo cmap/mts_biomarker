@@ -16,6 +16,17 @@ library(magrittr)
 data_dir <- args[1]
 output_dir <- args[2]
 
+project_name<-basename(data_dir)
+safe_name <- stringr::str_replace_all(project_name, "[[:punct:]\\s]+", "_")
+
+data_dir_name<-dirname(data_dir)
+output_dir_name<-dirname(output_dir)
+
+# Use stdout as per normal...
+
+data_dir<-paste(data_dir_name, safe_name, sep = "/")
+output_dir<-paste(output_dir_name, safe_name, sep = "/")
+
 #---- LOAD THE DATA ----
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
 lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
