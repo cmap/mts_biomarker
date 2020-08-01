@@ -16,6 +16,8 @@ batch_index=${AWS_BATCH_JOB_ARRAY_INDEX}
 project="${a_projects[${batch_index}]}"
 export HDF5_USE_FILE_LOCKING=FALSE
 
+echo "${batch_index}"
+echo "${data_dir}/${project}" "${output_dir}/${project}"
 Rscript /run_script.R "${data_dir}/${project}" "${output_dir}/${project}"
 
 exit_code=$?
