@@ -16,16 +16,19 @@ library(magrittr)
 data_dir <- args[1]
 output_dir <- args[2]
 
-project_name<-basename(data_dir)
+#Extract the project id from the input patha and make the name safe so that it matches the MTS input folder name
+pert_name<-basename(data_dir)
+parent_dir<-dirname(data_dir)
+project_name<-basename(parent_dir)
+path_to_project<-dirname(parent_dir)
 safe_name <- stringr::str_replace_all(project_name, "[[:punct:]\\s]+", "_")
+temp_out_dir<-dirname(output_dir)
+temp_out_dir<-dirname(temp_out_dir)
 
-data_dir_name<-dirname(data_dir)
-output_dir_name<-dirname(output_dir)
+#new data and output directories
+data_dir<-paste(path_to_project, safe_name, pert_name, sep = "/")
+output_dir<-paste(temp_out_dir, safe_name, pert_name, sep = "/")
 
-# Use stdout as per normal...
-
-data_dir<-paste(data_dir_name, safe_name, sep = "/")
-output_dir<-paste(output_dir_name, safe_name, sep = "/")
 
 #---- LOAD THE DATA ----
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
