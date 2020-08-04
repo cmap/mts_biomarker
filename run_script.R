@@ -34,7 +34,7 @@ output_dir<-paste(temp_out_dir, safe_name, pert_name, sep = "/")
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
 lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
 DRC <- data.table::fread(drc_path) %>%
-  dplyr::distinct(ccle_name, culture, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
+  dplyr::distinct(ccle_name, culture, pert_time, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
   dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
                                    3 * max_dose, log2.ic50),
                 log2.auc = log2(auc)) %>%
@@ -42,7 +42,7 @@ DRC <- data.table::fread(drc_path) %>%
                       names_to = "dose", values_to = "response") %>%
   dplyr::filter(is.finite(response))
 LFC <- data.table::fread(lfc_path) %>%
-  dplyr::distinct(pert_name, ccle_name, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
+  dplyr::distinct(pert_name, ccle_name, pert_time, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
   dplyr::rename(response = LFC.cb, dose = pert_idose) %>%
   dplyr::filter(is.finite(response))
 
@@ -60,7 +60,7 @@ rep_meta <- load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
   dplyr::select(column_name, name) %>%
   dplyr::mutate(column_name = paste0("REP_", column_name))
 
-runs <- distinct(all_Y, pert_name, pert_mfc_id, dose)
+runs <- distinct(all_Y, pert_time, pert_name, pert_mfc_id, dose)
 
 #---- LOOP THORUGH DATASETS AND DOSES ----
 
@@ -77,7 +77,7 @@ for(feat in 1:length(linear_data)) {
     # filter down to current dose (run)
     run <- runs[i,]
     Y <- all_Y %>%
-      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+      dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
 
@@ -96,6 +96,7 @@ for(feat in 1:length(linear_data)) {
       dplyr::filter(rank <= 500) %>%
       dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
+                    pert_time = run$pert_time,
                     dose = run$dose,
                     feature_type = linear_names[feat])
 
@@ -125,7 +126,7 @@ for(feat in 1:length(linear_data)) {
       # filter down to current dose (run)
       run <- runs[i,]
       Y <- all_Y %>%
-        dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+        dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
       y <- Y$response; names(y) <- Y$ccle_name
       y <- y[is.finite(y)]
 
@@ -145,6 +146,7 @@ for(feat in 1:length(linear_data)) {
         dplyr::filter(rank <= 500) %>%
         dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                       pert_name = run$pert_name,
+                      pert_time = run$pert_time,
                       dose = run$dose,
                       feature_type = "GE_noLIN")
       linear_table[[ix]] <- res.cor; ix <- ix + 1
@@ -162,7 +164,7 @@ for(feat in 1:length(discrete_data)) {
   for(i in 1:nrow(runs)) {
     run <- runs[i,]
     Y <- all_Y %>%
-      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+      dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
 
@@ -176,6 +178,7 @@ for(feat in 1:length(discrete_data)) {
     res.disc %<>%
       dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
+                    pert_time = run$pert_time,
                     dose = run$dose,
                     feature_type = toupper(discrete_data[feat]))
 
@@ -204,7 +207,7 @@ for(feat in 1:length(rf_data)) {
   for (i in 1:nrow(runs)) {
     run <- runs[i,]
     Y <- all_Y %>%
-      dplyr::inner_join(run, by = c("pert_name", "pert_mfc_id", "dose"))
+      dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
 
@@ -219,12 +222,14 @@ for(feat in 1:length(rf_data)) {
       dplyr::mutate(model = model,
                     pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
+                    pert_time = run$pert_time,
                     dose = run$dose)
     res.features <- res.rf$model_table %>%
       dplyr::distinct(feature, RF.imp.mean, RF.imp.sd, RF.imp.stability, rank) %>%
       dplyr::mutate(model = model,
                     pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
+                    pert_time = run$pert_time,
                     dose = run$dose)
     random_forest_table[[ix]] <- res.features; model_table[[ix]] <- res.model
   }
