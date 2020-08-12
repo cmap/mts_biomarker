@@ -232,6 +232,7 @@ for(feat in 1:length(rf_data)) {
                     pert_time = run$pert_time,
                     dose = run$dose)
     random_forest_table[[ix]] <- res.features; model_table[[ix]] <- res.model
+    ix <- ix + 1
   }
 }
 random_forest_table %<>% dplyr::bind_rows(); model_table %<>% dplyr::bind_rows()
