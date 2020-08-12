@@ -92,8 +92,9 @@ for(feat in 1:length(linear_data)) {
       cbind(., rho=res.lin$rho[rownames(.),], q.val=res.lin$q.val[rownames(.),]) %>%
       tibble::as_tibble() %>%
       dplyr::rename(feature = ind.var, coef = rho) %>%
+      dplyr::arrange(q.val) %>%
       dplyr::mutate(rank = 1:n()) %>%
-      dplyr::filter(rank <= 500) %>%
+      dplyr::filter(rank <= 1000) %>%
       dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
                     pert_time = run$pert_time,
@@ -142,8 +143,9 @@ for(feat in 1:length(linear_data)) {
         cbind(., rho=res.lin$rho[rownames(.),], q.val=res.lin$q.val[rownames(.),]) %>%
         tibble::as_tibble() %>%
         dplyr::rename(feature = ind.var, coef = rho) %>%
+        dplyr::arrange(q.val) %>%
         dplyr::mutate(rank = 1:n()) %>%
-        dplyr::filter(rank <= 500) %>%
+        dplyr::filter(rank <= 1000) %>%
         dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                       pert_name = run$pert_name,
                       pert_time = run$pert_time,
@@ -187,7 +189,7 @@ for(feat in 1:length(discrete_data)) {
       res.disc %<>%
         dplyr::arrange(q.value) %>%
         dplyr::mutate(rank = 1:n()) %>%
-        dplyr::filter(rank <= 500) %>%
+        dplyr::filter(rank <= 1000) %>%
         dplyr::select(-rank)
     }
 
