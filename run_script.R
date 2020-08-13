@@ -31,8 +31,8 @@ output_dir<-paste(temp_out_dir, safe_name, pert_name, sep = "/")
 
 
 #---- LOAD THE DATA ----
-drc_path <- list.files(data_dir, pattern = "DRC_TABLE", full.names = T)
-lfc_path <- list.files(data_dir, pattern = "LFC_TABLE", full.names = T)
+drc_path <- list.files(data_dir, pattern = "DRC_TABLE.csv", full.names = T)
+lfc_path <- list.files(data_dir, pattern = "LFC_TABLE.csv", full.names = T)
 DRC <- data.table::fread(drc_path) %>%
   dplyr::distinct(ccle_name, culture, pert_time, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
   dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
