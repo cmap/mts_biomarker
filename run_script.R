@@ -16,7 +16,7 @@ library(magrittr)
 data_dir <- args[1]
 output_dir <- args[2]
 
-#Extract the project id from the input patha and make the name safe so that it matches the MTS input folder name
+# extract the project id from the input path and make the name safe so that it matches the MTS input folder name
 pert_name<-basename(data_dir)
 parent_dir<-dirname(data_dir)
 project_name<-basename(parent_dir)
@@ -34,14 +34,22 @@ output_dir <- paste(temp_out_dir, safe_name, safe_pert, sep = "/")
 #---- LOAD THE DATA ----
 drc_path <- list.files(data_dir, pattern = "DRC_TABLE.csv", full.names = T)
 lfc_path <- list.files(data_dir, pattern = "LFC_TABLE.csv", full.names = T)
-DRC <- data.table::fread(drc_path) %>%
-  dplyr::distinct(ccle_name, culture, pert_time, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
-  dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
-                                   3 * max_dose, log2.ic50),
-                log2.auc = log2(auc)) %>%
-  tidyr::pivot_longer(cols = c("log2.auc", "log2.ic50"),
-                      names_to = "dose", values_to = "response") %>%
-  dplyr::filter(is.finite(response))
+
+# read dose-response if it's there
+if (length(drc_path == 1)) {
+  DRC <- data.table::fread(drc_path) %>%
+    dplyr::distinct(ccle_name, culture, pert_time, pert_name, pert_mfc_id, auc, log2.ic50, max_dose) %>%
+    dplyr::mutate(log2.ic50 = ifelse((is.finite(auc) & is.na(log2.ic50)),
+                                     3 * max_dose, log2.ic50),
+                  log2.auc = log2(auc)) %>%
+    tidyr::pivot_longer(cols = c("log2.auc", "log2.ic50"),
+                        names_to = "dose", values_to = "response") %>%
+    dplyr::filter(is.finite(response)) 
+} else {
+  DRC <- tibble()
+}
+
+# always expect LFC table
 LFC <- data.table::fread(lfc_path) %>%
   dplyr::distinct(pert_name, ccle_name, pert_time, culture, pert_idose, pert_mfc_id, LFC.cb) %>%
   dplyr::rename(response = LFC.cb, dose = pert_idose) %>%
