@@ -17,14 +17,14 @@ data_dir <- args[1]
 output_dir <- args[2]
 
 # extract the project id from the input path and make the name safe so that it matches the MTS input folder name
-pert_name<-basename(data_dir)
-parent_dir<-dirname(data_dir)
-project_name<-basename(parent_dir)
-path_to_project<-dirname(parent_dir)
+pert_name <- basename(data_dir)
+parent_dir <- dirname(data_dir)
+project_name <- basename(parent_dir)
+path_to_project <- dirname(parent_dir)
 safe_name <- stringr::str_replace_all(project_name, "[[:punct:]\\s]+", "_")
 safe_pert <- stringr::str_replace_all(pert_name, "[[:punct:]\\s]+", "-")
-temp_out_dir<-dirname(output_dir)
-temp_out_dir<-dirname(temp_out_dir)
+temp_out_dir <- dirname(output_dir)
+temp_out_dir <- dirname(temp_out_dir)
 
 #new data and output directories
 data_dir <- paste(path_to_project, safe_name, safe_pert, sep = "/")
