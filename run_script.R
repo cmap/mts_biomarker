@@ -69,6 +69,10 @@ rep_meta <- load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
   dplyr::select(column_name, name) %>%
   dplyr::mutate(column_name = paste0("REP_", column_name))
 
+# get lineage principal components to use as confounder
+LIN_PCs <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+                                  data.file="linPCA", quiet=T)
+
 runs <- distinct(all_Y, pert_time, pert_name, pert_mfc_id, dose)
 
 #---- LOOP THORUGH DATASETS AND DOSES ----
@@ -76,11 +80,11 @@ runs <- distinct(all_Y, pert_time, pert_name, pert_mfc_id, dose)
 # linear associations
 linear_table <- list(); ix <- 1
 for(feat in 1:length(linear_data)) {
-
+  
   # load feature set
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
                               data.file=linear_data[feat], quiet=T)
-
+  
   # for each perturbation get results
   for(i in 1:nrow(runs)) {
     # filter down to current dose (run)
@@ -89,12 +93,12 @@ for(feat in 1:length(linear_data)) {
       dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
-
+    
     # get overlapping data
     overlap <- dplyr::intersect(rownames(X), names(y))
     y <- y[overlap]
     if (length(y) < 5 | min(y) == max(y)) next
-
+    
     # calculate correlations
     res.lin <- cdsrmodels::lin_associations(X[overlap,], y)
     res.cor <- res.lin$res.table %>%
@@ -109,7 +113,7 @@ for(feat in 1:length(linear_data)) {
                     pert_time = run$pert_time,
                     dose = run$dose,
                     feature_type = linear_names[feat])
-
+    
     # for repurposing replace metadata
     if (linear_data[feat] == "rep") {
       res.cor %<>%
@@ -118,19 +122,14 @@ for(feat in 1:length(linear_data)) {
         dplyr::rename(feature = name) %>%
         dplyr::mutate(feature = paste("REP", feature, sep = "_"))
     }
-
+    
     # append to output tables
     linear_table[[ix]] <- res.cor; ix <- ix + 1
   }
-
+  
   # gene expression with lineage as confounder
   if (linear_data[feat] == "ge") {
-    # get lineage principal components to use as confounder
-    LIN <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
-                                  data.file="lin", quiet=T)
-    LIN_PCs <- gmodels::fast.prcomp(LIN);
-    LIN_PCs <-  LIN %*% LIN_PCs$rotation[, LIN_PCs$sdev  > 0.2]
-
+    
     # for each perturbation get results
     for(i in 1:nrow(runs)) {
       # filter down to current dose (run)
@@ -139,13 +138,13 @@ for(feat in 1:length(linear_data)) {
         dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
       y <- Y$response; names(y) <- Y$ccle_name
       y <- y[is.finite(y)]
-
+      
       # get overlapping data
       overlap <- dplyr::intersect(rownames(X), names(y)) %>%
         dplyr::intersect(., rownames(LIN_PCs))
       y <- y[overlap]
       if (length(y) < 5 | min(y) == max(y)) next
-
+      
       # calculate correlations
       res.lin <- cdsrmodels::lin_associations(X[overlap,], y, W = LIN_PCs[overlap,])
       res.cor <- res.lin$res.table %>%
@@ -169,30 +168,29 @@ linear_table %<>% dplyr::bind_rows()
 # repeat for discrete t-test
 discrete_table <- list(); ix <- 1
 for(feat in 1:length(discrete_data)) {
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
                               data.file=discrete_data[feat], quiet=T)
-
   for(i in 1:nrow(runs)) {
     run <- runs[i,]
     Y <- all_Y %>%
       dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
-
+    
     overlap <- dplyr::intersect(rownames(X), names(y))
     y <- y[overlap]
-
+    
     if (length(y) < 5 | min(y) == max(y)) next
-
+    
     res.disc <- cdsrmodels::discrete_test(X[overlap,], y)
-
+    
     res.disc %<>%
       dplyr::mutate(pert_mfc_id = run$pert_mfc_id,
                     pert_name = run$pert_name,
                     pert_time = run$pert_time,
                     dose = run$dose,
                     feature_type = toupper(discrete_data[feat]))
-
+    
     # only keep top 500 mutations
     if (discrete_data[feat] == "mut" & nrow(res.disc) > 0) {
       res.disc %<>%
@@ -201,7 +199,7 @@ for(feat in 1:length(discrete_data)) {
         dplyr::filter(rank <= 1000) %>%
         dplyr::select(-rank)
     }
-
+    
     discrete_table[[ix]] <- res.disc; ix <- ix + 1
   }
 }
@@ -210,23 +208,23 @@ discrete_table %<>% dplyr::bind_rows()
 # repeat for random forest
 random_forest_table <- list(); model_table <- list(); ix <- 1
 for(feat in 1:length(rf_data)) {
-
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=7,
+  
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
                               data.file=rf_data[feat], quiet=T)
   model <- word(rf_data[feat], 2, sep = fixed("-"))
-
+  
   for (i in 1:nrow(runs)) {
     run <- runs[i,]
     Y <- all_Y %>%
       dplyr::inner_join(run, by = c("pert_time", "pert_name", "pert_mfc_id", "dose"))
     y <- Y$response; names(y) <- Y$ccle_name
     y <- y[is.finite(y)]
-
+    
     overlap <- dplyr::intersect(rownames(X), names(y))
     y <- y[overlap]
-
+    
     if (length(y) < 5 | min(y) == max(y)) next
-
+    
     res.rf <- cdsrmodels::random_forest(X[overlap,], y)
     res.model <- res.rf$model_table %>%
       dplyr::distinct(MSE, MSE.se, R2, PearsonScore) %>%
