@@ -23,7 +23,7 @@ pert_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index]
 folder_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index].project_id')
 
 echo "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
-Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}" ${data_version}
+Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}" "${data_version}"
 
 exit_code=$?
 

@@ -1,5 +1,5 @@
 #---- PRE-SETUP (arguments and packages) ----
-# Pass 2 arguments in this order:
+# Pass 3 arguments in this order:
 # args[1] = full path to directory with data for a compound/project
 # args[2] = full path to directory for output data
 # args[3] = data version number for taiga
