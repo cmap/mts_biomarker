@@ -8,6 +8,9 @@ while getopts ":i:o:" arg; do
       ;;
     o) # specifcy output folder
       output_dir=${OPTARG}
+      ;;
+    d) # specify data version
+      data_version=${OPTARG}
   esac
 done
 
@@ -20,7 +23,7 @@ pert_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index]
 folder_name=$(echo "${projects}" | jq -r --argjson index ${batch_index} '.[$index].project_id')
 
 echo "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
-Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}"
+Rscript /run_script.R "${data_dir}/${folder_name}/${pert_name}" "${output_dir}/${folder_name}/${pert_name}" $data_version
 
 exit_code=$?
 
