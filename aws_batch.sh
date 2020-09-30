@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # read in flagged arguments
-while getopts ":i:o:" arg; do
+while getopts ":i:o:d:" arg; do
   case $arg in
     i) # specify input folder
       data_dir=${OPTARG}

@@ -9,10 +9,10 @@ if (length(args) != 3) {
 }
 
 # packages
-library(tidyverse)
-library(cdsrmodels)
-library(taigr)
-library(magrittr)
+suppressMessages(library(tidyverse))
+suppressMessages(library(cdsrmodels))
+suppressMessages(library(taigr))
+suppressMessages(library(magrittr))
 
 data_dir <- args[1]
 output_dir <- args[2]

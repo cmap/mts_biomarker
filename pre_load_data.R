@@ -1,4 +1,4 @@
-library(taigr)
+suppressMessages(library(taigr))
 # pass data version as argument
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args) != 1) {
