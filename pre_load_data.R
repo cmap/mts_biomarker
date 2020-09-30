@@ -1,4 +1,10 @@
 library(taigr)
+# pass data version as argument
+args <- commandArgs(trailingOnly=TRUE)
+if (length(args) != 1) {
+  stop("Please pass a data version to load", call.=FALSE)
+}
+ver <- as.numeric(args[1])
 
 # lists of required files
 rf_data <- c("x-all", "x-ccle")
@@ -14,14 +20,14 @@ errors = c()
 for (data in all_files) {
   # try and retry once if error (tracking unsuccessful files)
   tryCatch(
-    expr = {taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+    expr = {taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                                    data.file=data, quiet=T)
     },
     error = function(e) {
       message(paste("Unable to load file:", data, "- will try again..."))
       message(e)
       tryCatch(
-        expr = {taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+        expr = {taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                                        data.file=data, quiet=T)
         },
         error = function(e2) {

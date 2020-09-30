@@ -2,6 +2,7 @@
 # Pass 2 arguments in this order:
 # args[1] = full path to directory with data for a compound/project
 # args[2] = full path to directory for output data
+# args[3] = data version number for taiga
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args) != 2) {
   stop("Supply the required arguments as described", call.=FALSE)
@@ -15,6 +16,7 @@ library(magrittr)
 
 data_dir <- args[1]
 output_dir <- args[2]
+ver <- as.numeric(args[3])
 
 # extract the project id from the input path and make the name safe so that it matches the MTS input folder name
 pert_name <- basename(data_dir)
@@ -70,7 +72,7 @@ rep_meta <- load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
   dplyr::mutate(column_name = paste0("REP_", column_name))
 
 # get lineage principal components to use as confounder
-LIN_PCs <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+LIN_PCs <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                                   data.file="linPCA", quiet=T)
 
 runs <- distinct(all_Y, pert_time, pert_name, pert_mfc_id, dose)
@@ -82,7 +84,7 @@ linear_table <- list(); ix <- 1
 for(feat in 1:length(linear_data)) {
   
   # load feature set
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                               data.file=linear_data[feat], quiet=T)
   
   # for each perturbation get results
@@ -168,7 +170,7 @@ linear_table %<>% dplyr::bind_rows()
 # repeat for discrete t-test
 discrete_table <- list(); ix <- 1
 for(feat in 1:length(discrete_data)) {
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                               data.file=discrete_data[feat], quiet=T)
   for(i in 1:nrow(runs)) {
     run <- runs[i,]
@@ -209,7 +211,7 @@ discrete_table %<>% dplyr::bind_rows()
 random_forest_table <- list(); model_table <- list(); ix <- 1
 for(feat in 1:length(rf_data)) {
   
-  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=9,
+  X <- taigr::load.from.taiga(data.name="mts013-b75e", data.version=ver,
                               data.file=rf_data[feat], quiet=T)
   model <- word(rf_data[feat], 2, sep = fixed("-"))
   
