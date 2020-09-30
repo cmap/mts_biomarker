@@ -38,4 +38,28 @@ for (data in all_files) {
       )
     })
 }
+
+# primary repurposing meta data (separate taiga directory, version is stable)
+# try and retry once if error (tracking unsuccessful files)
+tryCatch(
+  expr = {load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
+                          data.file='primary-replicate-collapsed-treatment-info',
+                          quiet = T)
+  },
+  error = function(e) {
+    message("Unable to load file: rep-meta - will try again...")
+    message(e)
+    tryCatch(
+      expr = {load.from.taiga(data.name='primary-screen-e5c7', data.version=10,
+                              data.file='primary-replicate-collapsed-treatment-info',
+                              quiet = T)
+      },
+      error = function(e2) {
+        message("Failed on second attempt")
+        message(e2)
+        errors <- c(errors, "rep-meta")
+      }
+    )
+  })
+
 if (length(errors) > 0) print(errors)
