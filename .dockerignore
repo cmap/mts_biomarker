@@ -7,3 +7,4 @@ README.md
 .gitignore
 run_script.sh
 docker-run-aws.sh
+docker-run-preload.sh

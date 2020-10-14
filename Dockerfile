@@ -5,6 +5,7 @@ COPY ./install_scripts.R /src/install_scripts.R
 RUN Rscript /src/install_scripts.R
 
 COPY ./run_script.R /run_script.R
+COPY ./pre_load_data.R /pre_load_data.R
 COPY ./aws_batch.sh /clue/bin/aws_batch
 
 WORKDIR /
